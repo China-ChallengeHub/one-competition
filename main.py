@@ -170,3 +170,4 @@ train,test=create_feature(df)
 cols = [col for col in train.columns if col not in ['id','y']]
 y_pred=evaluate_cv5_lgb(train,test,cols,True)
 print(roc_auc_score(test.y,y_pred))
+
