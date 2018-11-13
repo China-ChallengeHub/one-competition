@@ -22,10 +22,9 @@ import lightgbm as lgb
 pd.set_option('display.max_columns',100)
 gc.enable()
 
-
-
 df = pd.read_csv('./input/bank-additional-train.csv')
 df['y'].replace(['no','yes'],[0,1],inplace=True)
+
 
 def add_poly_features(data,column_names):
     # 组合特征
@@ -40,6 +39,7 @@ def add_poly_features(data,column_names):
 
 
 def create_feature(df):
+
     # 数值型数据处理
     # 'age', 'balance', 'duration', 'campaign', 'pdays', 'previous'，emp.var.rate，cons.price.idx，cons.conf.idx，euribor3m，nr.employed 
     def standardize_nan(x):
@@ -56,15 +56,11 @@ def create_feature(df):
     df["log_campaign"] = np.log(df['campaign'] + 1)
     df["log_pdays"] = np.log(df['pdays'] - df['pdays'].min() + 1)
     df['log_previous'] = np.log(df['previous'] + 1)  # 这里没有+1
-    df = df.drop(["age", "duration", "campaign", "pdays", "previous"], axis=1)  # duration 字段不能用
 
-    df['log_emp.var.rate'] = np.log(df['emp.var.rate'] + 1)  # 这里没有+1
     df['log_cons.price.idx'] = np.log(df['cons.price.idx'] + 1)  # 这里没有+1
     df['log_euribor3m'] = np.log(df['euribor3m'] + 1)  # 这里没有+1
-    df['log_nr.employed '] = np.log(df['nr.employed'] + 1)  # 这里没有+1
-    df = df.drop(["emp.var.rate", "cons.price.idx", "euribor3m", "nr.employed"], axis=1)
+    df['log_nr.employed'] = np.log(df['nr.employed'] + 1)  # 这里没有+1
 
-    # month 文字列与数値的変換
     # month 文字列与数値的変換
     df['month'] = df['month'].map({'jan': 1,
                                            'feb': 2,
@@ -79,30 +75,45 @@ def create_feature(df):
                                            'nov': 11,
                                            'dec': 12
                                            }).astype(int)
+    # 一周转换
+    df['day_of_week'] = df['day_of_week'].map({'mon': 1,
+                                   'tue': 2,
+                                   'wed': 3,
+                                   'thu': 4,
+                                   'fri': 5,
+                                   }).astype(int)
     # 1月:0、2月:31、3月:(31+28)、4月:(31+28+31)、 ...
     day_sum = pd.Series(np.cumsum([0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30]), index=np.arange(1, 13))
-    df['date'] = (df['month'].map(day_sum)).astype(int)
+    df['date_week1'] = (df['month'].map(day_sum)+df['day_of_week']).astype(int)
+    df['date_week2'] = (df['month'].map(day_sum)+df['day_of_week']+7).astype(int)
+    df['date_week3'] = (df['month'].map(day_sum)+df['day_of_week']+14).astype(int)
+    df['date_week4'] = (df['month'].map(day_sum)+df['day_of_week']+21).astype(int)
+
+    # 其他新增
+    df['total_touch'] = df['previous'] + df['campaign']  # 总联系人数
+    df['total_touch_log'] = np.log(df['total_touch'])
+
+    # 有序特征
+    lb=LabelEncoder()
+    df['marital_num'] = lb.fit_transform(df['marital'])
+    df['education_num']=lb.fit_transform(df['education']) # education 数值化
+    # df['housing_num']=lb.fit_transform(df['housing'])
+    # df['loan_num']=lb.fit_transform(df['loan'])
+    # df=add_poly_features(df,column_names=['marital_num','education_num'])
     # ------------End 数据预处理 类别编码-------------
 
     # ---------- Start 数据预处理 类别型数据------------
     # 类别型数据
-    # cate_cols = ['job', 'marital', 'education', 'default', 'housing', 'loan', 'contact', 'day_of_week', 'month','poutcome']
-    cate_cols = ['job', 'marital', 'education', 'default', 'housing', 'loan', 'contact', 'month','poutcome']
-    df.drop('day_of_week',axis=1,inplace=True)
+    cate_cols = ['job', 'marital', 'education', 'default', 'housing', 'loan', 'contact', 'day_of_week', 'month','poutcome']
     df = pd.get_dummies(df, columns=cate_cols)
     # ------------End 数据预处理 类别编码----------
-    cols = [col for col in df.columns if col not in ['y']]
+
+    df = df.drop(["age", "duration", "campaign", "pdays", "previous"], axis=1)  # duration 字段不能用
+    df = df.drop(["emp.var.rate", "cons.price.idx", "euribor3m", "nr.employed"], axis=1)
     train_len=18000
     new_train, new_test = df[:train_len], df[train_len:]
+    print(new_train.columns)
     return new_train,new_test
-
-
-# 调整参数
-def tune_params(model,params,X,y):
-    gsearch = GridSearchCV(estimator=model,param_grid=params, scoring='roc_auc')
-    gsearch.fit(X, y)
-    print(gsearch.cv_results_, gsearch.best_params_, gsearch.best_score_)
-    return gsearch
 
 
 # 特征重要性
@@ -110,6 +121,7 @@ def plot_fea_importance(classifier,X_train):
     plt.figure(figsize=(10,12))
     name = "xgb"
     indices = np.argsort(classifier.feature_importances_)[::-1][:40]
+    print(X_train.columns[indices][:40])
     g = sns.barplot(y=X_train.columns[indices][:40],
                     x=classifier.feature_importances_[indices][:40],orient='h')
     g.set_xlabel("Relative importance", fontsize=12)
