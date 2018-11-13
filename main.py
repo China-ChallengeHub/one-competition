@@ -57,9 +57,11 @@ def create_feature(df):
     df["log_pdays"] = np.log(df['pdays'] - df['pdays'].min() + 1)
     df['log_previous'] = np.log(df['previous'] + 1)  # 这里没有+1
 
+    df['log_emp.var.rate'] = np.log(df['emp.var.rate'] + 1)  # 这里没有+1
     df['log_cons.price.idx'] = np.log(df['cons.price.idx'] + 1)  # 这里没有+1
     df['log_euribor3m'] = np.log(df['euribor3m'] + 1)  # 这里没有+1
-    df['log_nr.employed'] = np.log(df['nr.employed'] + 1)  # 这里没有+1
+    df['log_nr.employed '] = np.log(df['nr.employed'] + 1)  # 这里没有+1
+
 
     # month 文字列与数値的変換
     df['month'] = df['month'].map({'jan': 1,
@@ -95,11 +97,10 @@ def create_feature(df):
 
     # 有序特征
     lb=LabelEncoder()
-    df['marital_num'] = lb.fit_transform(df['marital'])
+    marital_map = {"married": 1, "single": 3, "divorced": 2, "unknown": 0}
+    df['marital_num'] = df['marital'].map(marital_map)
     df['education_num']=lb.fit_transform(df['education']) # education 数值化
-    # df['housing_num']=lb.fit_transform(df['housing'])
-    # df['loan_num']=lb.fit_transform(df['loan'])
-    # df=add_poly_features(df,column_names=['marital_num','education_num'])
+    df['euribor3m_mean']=df['euribor3m']/3 #
     # ------------End 数据预处理 类别编码-------------
 
     # ---------- Start 数据预处理 类别型数据------------
