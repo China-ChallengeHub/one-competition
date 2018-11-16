@@ -63,6 +63,7 @@ def create_feature(df):
     df['log_nr.employed '] = np.log(df['nr.employed'] + 1)  # 这里没有+1
 
 
+
     # month 文字列与数値的変換
     df['month'] = df['month'].map({'jan': 1,
                                            'feb': 2,
@@ -101,6 +102,19 @@ def create_feature(df):
     df['marital_num'] = df['marital'].map(marital_map)
     df['education_num']=lb.fit_transform(df['education']) # education 数值化
     df['euribor3m_mean']=df['euribor3m']/3 #
+
+    df['Frequency contact'] = 0
+    df.loc[(df['pdays'] > 0) & (df['pdays'] < 120), 'Frequency contact'] = 1
+    df.loc[(df['pdays'] >= 120) & (df['pdays'] < 240), 'Frequency contact'] = 2
+    df.loc[(df['pdays'] >= 240), 'Frequency contact'] = 3
+
+    df['Young'] = 0
+    df['Middle aged'] = 0
+    df['Senior'] = 0
+    df.loc[(df['age'] <= 32) & (df['age'] >= 18), 'Young'] = 1
+    df.loc[(df['age'] <= 60) & (df['age'] >= 33), 'Middle aged'] = 1
+    df.loc[df['age'] >= 61, 'Senior'] = 1
+
     # ------------End 数据预处理 类别编码-------------
 
     # ---------- Start 数据预处理 类别型数据------------
@@ -110,7 +124,7 @@ def create_feature(df):
     # ------------End 数据预处理 类别编码----------
 
     df = df.drop(["age", "duration", "campaign", "pdays", "previous"], axis=1)  # duration 字段不能用
-    df = df.drop(["emp.var.rate", "cons.price.idx", "euribor3m", "nr.employed"], axis=1)
+    # df = df.drop(["emp.var.rate", "cons.price.idx", "euribor3m", "nr.employed"], axis=1)
     train_len=18000
     new_train, new_test = df[:train_len], df[train_len:]
     print(new_train.columns)
@@ -132,7 +146,7 @@ def plot_fea_importance(classifier,X_train):
     plt.show()
 
 
-def evaluate_cv5_lgb(train_df, test_df, cols, test=False):
+def evaluate_cv5_xgb(train_df, test_df, cols, test=False):
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     y_test = 0
     oof_train = np.zeros((train_df.shape[0],))
@@ -167,7 +181,7 @@ def evaluate_cv5_lgb(train_df, test_df, cols, test=False):
 
 
 train,test=create_feature(df)
-cols = [col for col in train.columns if col not in ['id','y']]
-y_pred=evaluate_cv5_lgb(train,test,cols,True)
+cols = [col for col in train.columns if col not in ['id','y','duration']]
+y_pred=evaluate_cv5_xgb(train,test,cols,True)
 print(roc_auc_score(test.y,y_pred))
 
